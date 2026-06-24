@@ -1,34 +1,83 @@
 from typing import Any
 from lf_toolkit.evaluation import Result, Params
 
+
+# Accepted IPA transcriptions for "battery".
+#
+# The word is built as:  b  æ  <medial>  (schwa?)  r  i
+#   - medial consonant : /t/ (RP citation), /ɾ/ (General American flap), /d/
+#   - schwa            : present in the careful 3-syllable form (ˈbæt.ə.ri),
+#                        absent in the common reduced 2-syllable form (ˈbæt.ri)
+#
+# We generate every sensible combination so that a correct answer is accepted
+# regardless of accent choice, syllable count, and narrow/broad rhotic symbol.
+_MEDIALS = ["t", "ɾ", "d"]
+_SCHWAS = ["ə", ""]
+_RHOTICS = ["r", "ɹ"]
+
+_ACCEPTED = {
+    f"bæ{medial}{schwa}{rhotic}i"
+    for medial in _MEDIALS
+    for schwa in _SCHWAS
+    for rhotic in _RHOTICS
+}
+
+
+def _normalise(text: Any) -> str:
+    """Strip the decoration around a transcription so we compare phonemes only.
+
+    Removes delimiters (/.../, [...]), the primary/secondary stress marks,
+    syllable separators and whitespace. The result is the bare phoneme string.
+    """
+    if not isinstance(text, str):
+        text = str(text)
+
+    # Characters that carry no phonemic content for this comparison.
+    for ch in ("/", "[", "]", "ˈ", "'", "ˌ", ".", " ", "\t", "\n"):
+        text = text.replace(ch, "")
+
+    return text.strip()
+
+
 def evaluation_function(
     response: Any,
     answer: Any,
     params: Params,
 ) -> Result:
     """
-    Function used to evaluate a student response.
-    ---
-    The handler function passes three arguments to evaluation_function():
+    Evaluate a student's IPA transcription of the word "Battery".
 
-    - `response` which are the answers provided by the student.
-    - `answer` which are the correct answers to compare against.
-    - `params` which are any extra parameters that may be useful,
-        e.g., error tolerances.
+    Accepts the common valid pronunciations:
+      - RP citation form        ˈbætəri  / ˈbætri
+      - General American flap   ˈbæɾəri  / ˈbæɾri
+      - voiced medial variant   ˈbædəri  / ˈbædri
 
-    The output of this function is what is returned as the API response
-    and therefore must be JSON-encodable. It must also conform to the
-    response schema.
-
-    Any standard python library may be used, as well as any package
-    available on pip (provided it is added to requirements.txt).
-
-    The way you wish to structure you code (all in this function, or
-    split into many) is entirely up to you. All that matters are the
-    return types and that evaluation_function() is the main function used
-    to output the evaluation response.
+    Stress marks, slashes/brackets, syllable dots and whitespace are ignored,
+    and both the broad (r) and narrow (ɹ) rhotic symbols are accepted.
     """
 
+    normalised_response = _normalise(response)
+
+    # Compare against the generated set of valid transcriptions. The supplied
+    # `answer` is also accepted (after normalisation) so the question's own key
+    # always counts as correct, even if it is a variant we did not enumerate.
+    accepted = set(_ACCEPTED)
+    accepted.add(_normalise(answer))
+
+    if normalised_response in accepted:
+        return Result(is_correct=True)
+
+    if not normalised_response:
+        return Result(
+            is_correct=False,
+            feedback="No transcription was provided. Transcribe \"battery\" in IPA, e.g. /ˈbætəri/.",
+        )
+
     return Result(
-        is_correct=response <= answer
+        is_correct=False,
+        feedback=(
+            "That isn't a recognised IPA transcription of \"battery\". "
+            "Expected something like /ˈbætəri/ (RP) or /ˈbæɾəri/ (General American). "
+            "Stress marks and slashes are optional."
+        ),
     )
