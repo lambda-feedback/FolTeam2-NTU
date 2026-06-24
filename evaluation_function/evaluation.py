@@ -70,14 +70,19 @@ def evaluation_function(
     if not normalised_response:
         return Result(
             is_correct=False,
-            feedback="No transcription was provided. Transcribe \"battery\" in IPA, e.g. /ˈbætəri/.",
+            feedback_items=[
+                ("empty", "No transcription was provided. Transcribe \"battery\" in IPA, e.g. /ˈbætəri/."),
+            ],
         )
 
     return Result(
         is_correct=False,
-        feedback=(
-            "That isn't a recognised IPA transcription of \"battery\". "
-            "Expected something like /ˈbætəri/ (RP) or /ˈbæɾəri/ (General American). "
-            "Stress marks and slashes are optional."
-        ),
+        feedback_items=[
+            (
+                "incorrect",
+                "That isn't a recognised IPA transcription of \"battery\". "
+                "Expected something like /ˈbætəri/ (RP) or /ˈbæɾəri/ (General American). "
+                "Stress marks and slashes are optional.",
+            ),
+        ],
     )
