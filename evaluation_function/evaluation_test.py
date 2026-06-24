@@ -40,3 +40,22 @@ class TestEvaluationFunction(unittest.TestCase):
 
         self.assertEqual(result.get("is_correct"), False)
         self.assertTrue(result.get("feedback"))
+
+    def test_reverse_ipa_to_word(self):
+        # answer is IPA -> direction auto-detected as ipa_to_word.
+        result = evaluation_function("battery", "/ˈbætɝi/", Params()).to_dict()
+
+        self.assertEqual(result.get("is_correct"), True)
+        self.assertIn("battery", result.get("feedback"))
+
+    def test_reverse_accepts_homophone(self):
+        # "read" (past tense) shares /ˈɹɛd/ with "red", so it should be accepted.
+        result = evaluation_function("read", "/ˈɹɛd/", Params()).to_dict()
+
+        self.assertEqual(result.get("is_correct"), True)
+
+    def test_reverse_wrong_word(self):
+        result = evaluation_function("computer", "/ˈbætɝi/", Params()).to_dict()
+
+        self.assertEqual(result.get("is_correct"), False)
+        self.assertTrue(result.get("feedback"))
