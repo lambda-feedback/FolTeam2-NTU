@@ -56,14 +56,25 @@ def _normalise(text: Any) -> str:
     return text.replace("ɹ", "r").strip()
 
 
-def _accepted_transcriptions(word: str, accents: Set[str]) -> Set[str]:
-    """Normalised set of valid transcriptions for `word` across the accents."""
-    accepted: Set[str] = set()
+# Human-readable names for the accents, used in feedback.
+_ACCENT_NAMES = {
+    "en_US": "General American (en_US)",
+    "en_UK": "Received Pronunciation (en_UK)",
+}
+
+
+def _accepted_map(word: str, accents: Set[str]) -> Dict[str, List[tuple]]:
+    """Map each normalised transcription of `word` to the (accent, raw) forms it came from.
+
+    Keeping the source lets us tell the student which accent they matched and
+    show the canonical spelling in the feedback.
+    """
+    accepted: Dict[str, List[tuple]] = {}
     for accent in accents:
         for raw in _load_accent(accent).get(word.lower(), []):
             normalised = _normalise(raw)
             if normalised:
-                accepted.add(normalised)
+                accepted.setdefault(normalised, []).append((accent, raw))
     return accepted
 
 
@@ -106,14 +117,14 @@ def evaluation_function(
         )
 
     accents = _requested_accents(params)
-    accepted = _accepted_transcriptions(str(word), set(accents))
+    accepted = _accepted_map(str(word), set(accents))
 
     if not accepted:
         # The word is not in the dictionaries: fall back to treating the
         # configured answer as a literal IPA transcription.
         answer_normalised = _normalise(answer)
         if answer_normalised:
-            accepted.add(answer_normalised)
+            accepted[answer_normalised] = [("answer", str(answer))]
 
     if not accepted:
         return Result(
@@ -134,7 +145,22 @@ def evaluation_function(
         )
 
     if normalised_response in accepted:
-        return Result(is_correct=True)
+        sources = accepted[normalised_response]
+        # Show the canonical dictionary spelling and which accent(s) it matches.
+        accent_names = [_ACCENT_NAMES.get(accent, accent) for accent, _ in sources if accent != "answer"]
+        canonical = sources[0][1]
+        if accent_names:
+            joined = " and ".join(dict.fromkeys(accent_names))
+            why = (
+                f"Correct! /{canonical.strip('/')}/ is the accepted {joined} "
+                f"IPA transcription of \"{word}\"."
+            )
+        else:
+            why = f"Correct! That matches the expected IPA transcription of \"{word}\"."
+        return Result(
+            is_correct=True,
+            feedback_items=[("correct", why)],
+        )
 
     return Result(
         is_correct=False,

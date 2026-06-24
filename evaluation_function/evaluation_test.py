@@ -21,10 +21,22 @@ class TestEvaluationFunction(unittest.TestCase):
     as it should.
     """
 
-    def test_evaluation(self):
-        response, answer, params = "Hello, World", "Hello, World", Params()
-
-        result = evaluation_function(response, answer, params).to_dict()
+    def test_correct_transcription_gives_feedback(self):
+        # The General American transcription of "battery" should be accepted,
+        # and a correct answer now comes with an explanation of why.
+        result = evaluation_function("ˈbætɝi", "battery", Params()).to_dict()
 
         self.assertEqual(result.get("is_correct"), True)
-        self.assertFalse(result.get("feedback", False))
+        self.assertTrue(result.get("feedback"))
+        self.assertIn("battery", result.get("feedback"))
+
+    def test_uk_variant_accepted(self):
+        result = evaluation_function("bætəri", "battery", Params()).to_dict()
+
+        self.assertEqual(result.get("is_correct"), True)
+
+    def test_incorrect_transcription(self):
+        result = evaluation_function("banana", "battery", Params()).to_dict()
+
+        self.assertEqual(result.get("is_correct"), False)
+        self.assertTrue(result.get("feedback"))
